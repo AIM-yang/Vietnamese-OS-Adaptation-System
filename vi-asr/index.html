@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>越南语语音识别</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .shadow-soft {
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            }
+            .transition-custom {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .error-message {
+                color: #EF4444;
+                font-size: 0.9rem;
+                margin-top: 0.5rem;
+            }
+            .debug-info {
+                color: #6B7280;
+                font-size: 0.8rem;
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-neutral">
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+        <!-- 页面标题 -->
+        <header class="text-center mb-12">
+            <h1 class="text-[clamp(1.8rem,5vw,2.8rem)] font-bold text-neutral mb-3">
+                越南语语音识别
+            </h1>
+            <p class="text-gray-500 max-w-2xl mx-auto">
+                上传越南语音频文件，系统将自动识别并返回处理结果
+            </p>
+        </header>
+        
+        <!-- 主内容区 -->
+        <main class="bg-white rounded-2xl shadow-soft p-6 md:p-8 mb-8">
+            <!-- 上传区域 -->
+            <div id="upload-area" class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center transition-custom hover:border-primary mb-8">
+                <div class="flex flex-col items-center">
+                    <i class="fa fa-microphone text-5xl text-primary mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">上传越南语音频</h2>
+                    <p class="text-gray-500 mb-6">支持常见音频格式（如MP3、WAV等）</p>
+                    
+                    <label class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-custom cursor-pointer inline-flex items-center">
+                        <i class="fa fa-upload mr-2"></i> 选择音频文件
+                        <input type="file" id="audio-file" accept="audio/*" class="hidden" />
+                    </label>
+                    
+                    <p id="file-name" class="mt-4 text-gray-600 hidden"></p>
+                    <div id="error-display" class="error-message hidden"></div>
+                    <div id="debug-display" class="debug-info hidden"></div>
+                </div>
+            </div>
+            
+            <!-- 控制按钮 -->
+            <div class="flex justify-center mb-8">
+                <button id="process-btn" class="bg-secondary hover:bg-secondary/90 text-white font-medium py-3 px-8 rounded-lg transition-custom disabled:opacity-50 disabled:cursor-not-allowed flex items-center" disabled>
+                    <i class="fa fa-cog mr-2"></i> 开始识别
+                </button>
+            </div>
+            
+            <!-- 处理状态 -->
+            <div id="processing" class="text-center hidden">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+                <p class="text-gray-600">正在处理音频，请稍候...</p>
+            </div>
+
+            <!-- 流式结果展示区域 -->
+            <div id="streaming-result" class="mt-6 bg-gray-50 p-4 rounded-lg hidden">
+                <p class="text-gray-500 text-sm mb-1">实时识别中...</p>
+                <p id="streaming-text" class="font-medium"></p>
+            </div>
+            
+            <!-- 结果展示区域 -->
+            <div id="result-area" class="hidden">
+                <h3 class="text-xl font-semibold mb-4 pb-2 border-b border-gray-100">识别结果</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-gray-500 text-sm mb-1">识别语言</p>
+                        <p id="language-result" class="font-medium text-lg">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-gray-500 text-sm mb-1">音频时长</p>
+                        <p id="duration-result" class="font-medium text-lg">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-gray-500 text-sm mb-1">处理时长</p>
+                        <p id="process-time-result" class="font-medium text-lg">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-gray-500 text-sm mb-1">实时率</p>
+                        <p id="realtime-ratio-result" class="font-medium text-lg">-</p>
+                    </div>
+                </div>
+                
+                <!-- 识别文本内容展示 -->
+                <div class="mt-6 bg-gray-50 p-4 rounded-lg">
+                    <p class="text-gray-500 text-sm mb-1">识别文本</p>
+                    <p id="transcription-result" class="font-medium">-- 暂无内容 --</p>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 信息提示 -->
+        <div class="bg-blue-50 border-l-4 border-primary p-4 rounded-r-lg">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fa fa-info-circle text-primary"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        实时率说明：小于1表示处理速度快于实时，数值越小处理效率越高
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <footer class="text-center mt-12 text-gray-400 text-sm">
+            <p>© 2023 越南语语音识别系统 | 技术支持</p>
+        </footer>
+    </div>
+    
+    <script>
+        // 获取DOM元素
+        const audioFileInput = document.getElementById('audio-file');
+        const fileNameDisplay = document.getElementById('file-name');
+        const processBtn = document.getElementById('process-btn');
+        const uploadArea = document.getElementById('upload-area');
+        const processingIndicator = document.getElementById('processing');
+        const resultArea = document.getElementById('result-area');
+        const errorDisplay = document.getElementById('error-display');
+        const debugDisplay = document.getElementById('debug-display');
+        
+        // 结果展示元素
+        const languageResult = document.getElementById('language-result');
+        const durationResult = document.getElementById('duration-result');
+        const processTimeResult = document.getElementById('process-time-result');
+        const realtimeRatioResult = document.getElementById('realtime-ratio-result');
+        const transcriptionResult = document.getElementById('transcription-result');
+        
+        // 流式结果元素
+        const streamingResult = document.getElementById('streaming-result');
+        const streamingText = document.getElementById('streaming-text');
+        
+        // 显示调试信息
+        function showDebugInfo(message) {
+            debugDisplay.textContent = `调试: ${message}`;
+            debugDisplay.classList.remove('hidden');
+        }
+        
+        // 隐藏调试信息
+        function hideDebugInfo() {
+            debugDisplay.textContent = '';
+            debugDisplay.classList.add('hidden');
+        }
+        
+        // 监听文件选择
+        audioFileInput.addEventListener('change', (e) => {
+            showDebugInfo('文件选择事件触发');
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                showDebugInfo(`选中文件: ${file.name}, 类型: ${file.type}`);
+                
+                // 验证文件类型
+                if (!file.type.startsWith('audio/')) {
+                    showError('请上传音频文件（支持MP3、WAV等格式）');
+                    resetUploadArea();
+                    return;
+                }
+                
+                fileNameDisplay.textContent = `已选择: ${file.name}`;
+                fileNameDisplay.classList.remove('hidden');
+                processBtn.removeAttribute('disabled');
+                hideError();
+                hideDebugInfo();
+                
+                // 视觉反馈
+                uploadArea.classList.add('border-primary', 'bg-blue-50/50');
+            } else {
+                resetUploadArea();
+            }
+        });
+        
+        // 拖放功能
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('border-primary', 'bg-blue-50/50');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('border-primary', 'bg-blue-50/50');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-primary', 'bg-blue-50/50');
+            
+            if (e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                if (!file.type.startsWith('audio/')) {
+                    showError('请上传音频文件（支持MP3、WAV等格式）');
+                    return;
+                }
+                audioFileInput.files = e.dataTransfer.files;
+                fileNameDisplay.textContent = `已选择: ${file.name}`;
+                fileNameDisplay.classList.remove('hidden');
+                processBtn.removeAttribute('disabled');
+                hideError();
+            }
+        });
+        
+        // 处理按钮点击事件 - 增加了详细的调试日志
+        processBtn.addEventListener('click', async () => {
+            console.log('开始识别按钮被点击');
+            if (!audioFileInput.files.length) {
+                showError('请先选择音频文件');
+                return;
+            }
+            
+            const file = audioFileInput.files[0];
+            showDebugInfo(`准备处理: ${file.name}`);
+            
+            // 显示处理状态和流式结果区域
+            processingIndicator.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+            streamingResult.classList.remove('hidden');
+            streamingText.textContent = '';
+            processBtn.disabled = true;
+            hideError();
+            
+            try {
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('audio', file);
+                formData.append('language', 'vi');
+                
+                // 记录开始时间
+                const startTime = Date.now();
+                showDebugInfo('正在发送流式请求到服务器...');
+                
+                // 使用Fetch API发送请求并处理流式响应
+                const response = await fetch('http://localhost:8000/transcribe-stream', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`服务器错误: ${response.status} ${response.statusText}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+                let metadata = null;
+
+                // 处理流式响应
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    // 解码接收到的内容
+                    const chunk = decoder.decode(value, { stream: true });
+                    // 处理SSE格式的消息（可能包含多个消息）
+                    const messages = chunk.split('\n\n').filter(m => m.trim());
+                    
+                    for (const message of messages) {
+                        if (message.startsWith('data:')) {
+                            const dataStr = message.slice(5).trim();
+                            if (dataStr) {
+                                const data = JSON.parse(dataStr);
+                                
+                                switch(data.type) {
+                                    case 'metadata':
+                                        metadata = data;
+                                        languageResult.textContent = data.language || '越南语';
+                                        durationResult.textContent = `${data.duration.toFixed(2)} 秒`;
+                                        break;
+                                        
+                                    case 'segment':
+                                        fullText += data.text + ' ';
+                                        streamingText.textContent = fullText;
+                                        break;
+                                        
+                                    case 'complete':
+                                        const endTime = Date.now();
+                                        const processDuration = (endTime - startTime) / 1000;
+                                        
+                                        // 更新最终结果
+                                        processTimeResult.textContent = `${processDuration.toFixed(2)} 秒`;
+                                        realtimeRatioResult.textContent = metadata 
+                                            ? `${(processDuration / metadata.duration).toFixed(2)}x`
+                                            : 'N/A';
+                                        transcriptionResult.textContent = fullText || '无识别结果';
+                                        
+                                        // 切换显示状态
+                                        processingIndicator.classList.add('hidden');
+                                        streamingResult.classList.add('hidden');
+                                        resultArea.classList.remove('hidden');
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                hideDebugInfo();
+                
+            } catch (error) {
+                console.error('处理出错:', error);
+                processingIndicator.classList.add('hidden');
+                streamingResult.classList.add('hidden');
+                showError(error.message || '处理过程中出现未知错误');
+                showDebugInfo(`错误详情: ${error.name}`);
+            } finally {
+                processBtn.disabled = false;
+            }
+        });
+        
+        // 辅助函数：显示错误信息
+        function showError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.classList.remove('hidden');
+        }
+        
+        // 辅助函数：隐藏错误信息
+        function hideError() {
+            errorDisplay.textContent = '';
+            errorDisplay.classList.add('hidden');
+        }
+        
+        // 重置上传区域样式
+        function resetUploadArea() {
+            fileNameDisplay.classList.add('hidden');
+            processBtn.disabled = true;
+            uploadArea.classList.remove('border-primary', 'bg-blue-50/50');
+            hideError();
+            hideDebugInfo();
+        }
+        
+        // 页面加载完成后验证按钮状态
+        window.addEventListener('load', () => {
+            console.log('页面加载完成，检查按钮状态:', processBtn.disabled);
+            showDebugInfo('页面已就绪，请选择音频文件');
+        });
+    </script>
+</body>
+</html>
