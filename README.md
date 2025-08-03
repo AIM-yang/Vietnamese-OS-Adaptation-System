@@ -23,4 +23,4 @@
 		main.py ： 主应用和API路由
 		schemas.py ：数据模型定义
 
-    前端：frontend\
+    前端：frontend
